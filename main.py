@@ -102,16 +102,40 @@ df = df.astype(object).where(pd.notna(df), None)
 
 # 4. CONNECT TO MYSQL
 
+
+# 4. CONNECT TO TIDB CLOUD
+
+DB_NAME = os.getenv("DB_NAME", "github_analytics")
+DB_CA_PATH = os.getenv("DB_CA_PATH")
+
+if not DB_CA_PATH:
+    raise ValueError("TiDB CA certificate path missing in .env")
+
+ca_path = Path(DB_CA_PATH)
+
+if not ca_path.is_absolute():
+    ca_path = Path(__file__).resolve().parent / ca_path
+
 db_url = URL.create(
     drivername="mysql+pymysql",
     username=DB_USER,
     password=DB_PASSWORD,
     host=DB_HOST,
     port=DB_PORT,
-    database="github_analytics"
+    database=DB_NAME
 )
 
-engine = create_engine(db_url)
+engine = create_engine(
+    db_url,
+    connect_args={
+        "ssl_verify_cert": True,
+        "ssl_verify_identity": True,
+        "ssl_ca": str(ca_path)
+    },
+    pool_recycle=300,
+    pool_pre_ping=True
+)
+
 
 
 # 5. PREPARE COMMON SNAPSHOT TIMESTAMP
