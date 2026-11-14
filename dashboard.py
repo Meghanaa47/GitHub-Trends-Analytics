@@ -31,6 +31,12 @@ st.caption(
 # 2. DATABASE CONNECTION
 # --------------------------------------------------
 
+
+# --------------------------------------------------
+# 2. DATABASE CONNECTION
+# --------------------------------------------------
+
+# Local development support
 load_dotenv(
     Path(__file__).resolve().parent / ".env",
     override=True
@@ -38,11 +44,22 @@ load_dotenv(
 
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = int(os.getenv("DB_PORT", "3306"))
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = int(os.getenv("DB_PORT", "4000"))
+DB_NAME = os.getenv("DB_NAME", "github_analytics")
+DB_CA_PATH = os.getenv("DB_CA_PATH", "ca.pem")
 
-if not DB_USER or not DB_PASSWORD:
-    st.error("Database credentials are missing in .env")
+if not DB_USER or not DB_PASSWORD or not DB_HOST:
+    st.error("Database credentials are missing.")
+    st.stop()
+
+ca_path = Path(DB_CA_PATH)
+
+if not ca_path.is_absolute():
+    ca_path = Path(__file__).resolve().parent / ca_path
+
+if not ca_path.exists():
+    st.error("TiDB CA certificate not found.")
     st.stop()
 
 db_url = URL.create(
@@ -51,10 +68,19 @@ db_url = URL.create(
     password=DB_PASSWORD,
     host=DB_HOST,
     port=DB_PORT,
-    database="github_analytics"
+    database=DB_NAME
 )
 
-engine = create_engine(db_url)
+engine = create_engine(
+    db_url,
+    connect_args={
+        "ssl_verify_cert": True,
+        "ssl_verify_identity": True,
+        "ssl_ca": str(ca_path)
+    },
+    pool_recycle=300,
+    pool_pre_ping=True
+)
 
 
 # --------------------------------------------------
